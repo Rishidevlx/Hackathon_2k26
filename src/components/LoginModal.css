@@ -1,0 +1,197 @@
+.login-page-container {
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--color-bg-dark);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-content-wrapper {
+    width: 90%;
+    max-width: 850px; /* Increased to fit the long headline better */
+    z-index: 10;
+    animation: zoomReveal 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.login-header-section {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.path-display {
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    color: var(--color-neon-blue);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+.login-headline {
+    font-family: var(--font-header);
+    font-size: 2.8rem;
+    color: #fff;
+    letter-spacing: 8px; /* Balanced spacing for centering */
+    text-shadow: 0 0 20px var(--color-neon-blue);
+    margin-bottom: 15px;
+    width: 100%;
+    text-align: center;
+}
+
+.headline-underline {
+    width: 60px;
+    height: 4px;
+    background: var(--color-neon-cyan);
+    margin: 0 auto;
+    box-shadow: 0 0 10px var(--color-neon-cyan);
+}
+
+/* Cyber Form Card */
+.login-card-cyber {
+    background: rgba(5, 10, 20, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    position: relative;
+    padding: 3rem;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.card-glitch-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--color-neon-cyan);
+    animation: scanLineH 2s linear infinite;
+}
+
+@keyframes scanLineH {
+    0% { transform: scaleX(0); opacity: 0; }
+    50% { transform: scaleX(1); opacity: 1; }
+    100% { transform: scaleX(0); opacity: 0; }
+}
+
+.input-group {
+    margin-bottom: 2rem;
+}
+
+.label-technical {
+    display: block;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    color: var(--color-neon-cyan);
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+}
+
+.label-prefix {
+    background: var(--color-neon-cyan);
+    color: #000;
+    padding: 1px 6px;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.cyber-input-wrapper {
+    position: relative;
+}
+
+.cyber-input-wrapper input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    padding: 15px 20px;
+    color: #fff;
+    font-family: var(--font-header);
+    font-size: 1.4rem;
+    letter-spacing: 6px;
+    outline: none;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    text-shadow: 0 0 5px var(--color-neon-cyan); /* Added text glow */
+}
+
+.cyber-input-wrapper input:focus {
+    border-color: var(--color-neon-cyan);
+    background: rgba(0, 229, 255, 0.05);
+    box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.1);
+}
+
+/* Error Display */
+.login-error {
+    margin-bottom: 2rem;
+    background: rgba(255, 0, 60, 0.1);
+    border-left: 3px solid var(--color-accent-red);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.error-text {
+    font-family: var(--font-code);
+    color: var(--color-accent-red);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+/* Actions */
+.login-actions {
+    display: flex;
+    gap: 20px;
+}
+
+.btn-abort {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #555;
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-abort:hover {
+    border-color: var(--color-accent-red);
+    color: var(--color-accent-red);
+    background: rgba(255, 0, 60, 0.1);
+    box-shadow: 0 0 15px rgba(255, 0, 60, 0.2);
+}
+
+.btn-confirm {
+    flex: 2;
+    background: var(--color-neon-cyan);
+    border: none;
+    color: #000;
+    font-family: var(--font-header);
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-confirm:hover {
+    background: #fff;
+    box-shadow: 0 0 20px var(--color-neon-cyan);
+}
+
+.btn-confirm.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Desktop vs Mobile adjustments already handled in LandingPage.css usually, 
+   but ensuring centering here. */
+@media (max-width: 768px) {
+    .login-headline { font-size: 2rem; letter-spacing: 5px; }
+    .login-card-cyber { padding: 1.5rem; }
+}
