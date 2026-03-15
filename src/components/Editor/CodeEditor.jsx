@@ -1,5 +1,11 @@
 import React from 'react';
-import Editor from "@monaco-editor/react";
+import Editor, { loader } from "@monaco-editor/react";
+import * as monaco from 'monaco-editor';
+
+// ── Load Monaco from local node_modules (avoids jsDelivr CDN + Edge tracking warnings) ──
+loader.config({ monaco });
+
+
 
 const CodeEditor = ({ value, onChange, language = "c", readOnly = false, onPasteError }) => {
 

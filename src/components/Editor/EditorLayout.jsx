@@ -54,14 +54,18 @@ const SuccessOverlay = ({ userData }) => {
             {/* Right Side: Spline 3D Model */}
             <div style={{ flex: 0.8, position: 'relative', background: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 <div style={{ width: '100%', height: '100%', transform: 'scale(0.85)', transformOrigin: 'center center' }}>
-                    <iframe 
+                    <iframe
                         src="https://my.spline.design/genkubgreetingrobot-dHkC8WmEOeObVhqQioTjKdt7/"
-                        frameBorder="0" 
-                        width="100%" 
+                        frameBorder="0"
+                        width="100%"
                         height="100%"
+                        allow="storage-access *; autoplay"
+                        sandbox="allow-scripts allow-same-origin allow-storage-access-by-user-activation allow-forms"
+                        title="success-animation"
                     />
                 </div>
             </div>
+
 
             <style>{`
                 .neon-pulse {
@@ -138,7 +142,7 @@ const EditorLayout = ({ userData, onLogout }) => {
         fetchSessionDuration();
     }, []); // ← [] means: runs ONCE only on mount, NOT a recurring poll
 
-
+    const [isRunning, setIsRunning] = useState(false);
     const [isSessionActive, setIsSessionActive] = useState(Boolean(userData.dbStartTime));
     const [isSuccess, setIsSuccess] = useState(userData.dbStatus === 'finished');
     const [attempts, setAttempts] = useState(0);
