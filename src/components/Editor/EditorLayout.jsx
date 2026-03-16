@@ -220,14 +220,9 @@ const EditorLayout = ({ userData, onLogout }) => {
         ? codeMap[currentPattern.id]
         : BOILERPLATES[language];
 
-    const [logs, setLogs] = useState([
-        { time: new Date().toLocaleTimeString(), text: 'System Initialized...', type: 'system' },
-        { time: new Date().toLocaleTimeString(), text: 'Press START SYSTEM to begin session...', type: 'info' }
-    ]);
+    const [logs, setLogs] = useState([]);
 
-    const handleClearLogs = () => {
-        setLogs([{ time: new Date().toLocaleTimeString(), text: 'Terminal Cleared', type: 'system' }]);
-    };
+    const handleClearLogs = () => setLogs([]);
 
     useEffect(() => {
         let timer;
@@ -271,7 +266,6 @@ const EditorLayout = ({ userData, onLogout }) => {
     };
 
     const handleStartSession = async () => {
-        setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: '> INITIATING SESSION START...', type: 'info' }]);
         try {
             const response = await fetch(`${API_URL}/api/start`, {
                 method: 'POST',
@@ -282,10 +276,20 @@ const EditorLayout = ({ userData, onLogout }) => {
             if (data.success && data.start_time) {
                 userData.dbStartTime = data.start_time;
                 setIsSessionActive(true);
-                setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: '> SESSION STARTED. EDITOR UNLOCKED.', type: 'system' }]);
             }
         } catch (err) { }
     };
+
+    // ── Auto-start once on login — ref prevents StrictMode double-call ────────
+    const autoStarted = React.useRef(false);
+    useEffect(() => {
+        if (autoStarted.current) return;       // already called — skip StrictMode 2nd run
+        autoStarted.current = true;
+        if (!userData.dbStartTime && !isSuccess && !isDisqualified) {
+            handleStartSession();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const stateRef = React.useRef();
     useEffect(() => {
@@ -332,8 +336,6 @@ const EditorLayout = ({ userData, onLogout }) => {
 
         setIsRunning(true);
         if (isSubmit) setAttempts(prev => prev + 1);
-        const startTime = new Date().toLocaleTimeString();
-        setLogs(prev => [...prev, { time: startTime, text: `> ${isSubmit ? 'SUBMITTING' : 'RUNNING'} code on compiler...`, type: 'info' }]);
 
         try {
             const response = await fetch(`${API_URL}/api/execute`, {
@@ -345,8 +347,8 @@ const EditorLayout = ({ userData, onLogout }) => {
             setIsRunning(false);
             if (result.run) {
                 const output = result.run.stdout || result.run.stderr;
-                setLogs(prev => [...prev, 
-                    { time: new Date().toLocaleTimeString(), text: `> ${isSubmit ? 'Submission' : 'Execution'} Complete.`, type: 'system' },
+                // Only show the raw output — no extra wrapper messages
+                setLogs(prev => [...prev,
                     { time: '', text: output, type: result.run.stderr ? 'error' : 'output' }
                 ]);
 
@@ -389,16 +391,10 @@ const EditorLayout = ({ userData, onLogout }) => {
 
     const handleLanguageChange = (e) => {
         const newLang = e.target.value;
-        const oldLang = language;
         setLanguage(newLang);
-        
-        // If the current code for the current pattern is exactly the boilerplate of the old language,
-        // swap it to the new language's boilerplate immediately.
+        // Always reset editor to new language boilerplate when compiler changes
         if (currentPattern) {
-            const currentVal = codeMap[currentPattern.id] || BOILERPLATES[oldLang];
-            if (currentVal === BOILERPLATES[oldLang]) {
-                setCodeMap(prev => ({ ...prev, [currentPattern.id]: BOILERPLATES[newLang] }));
-            }
+            setCodeMap(prev => ({ ...prev, [currentPattern.id]: BOILERPLATES[newLang] }));
         }
     };
 
@@ -441,27 +437,25 @@ const EditorLayout = ({ userData, onLogout }) => {
                     <div className="brand" style={{ fontFamily: 'Orbitron', color: '#00e5ff', fontWeight: 'bold', fontSize: '1.3rem', letterSpacing: '1px', textShadow: '0 0 10px rgba(0,229,255,0.4)' }}>HACKATHON_2K26_BCA</div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                    <div style={{ position: 'relative' }} title={isSessionActive ? "Compiler locked after session start" : ""}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <div style={{ position: 'relative' }}>
                         <select 
                             value={language} 
-                            onChange={handleLanguageChange} 
-                            disabled={isSessionActive} 
+                            onChange={handleLanguageChange}
                             style={{ 
                                 background: '#000', 
-                                color: isSessionActive ? '#444' : '#00e5ff', 
-                                border: `1px solid ${isSessionActive ? '#333' : '#00e5ff'}`, 
+                                color: '#00e5ff', 
+                                border: '1px solid #00e5ff', 
                                 padding: '6px 12px', 
                                 fontFamily: 'Orbitron', 
                                 outline: 'none',
-                                cursor: isSessionActive ? 'not-allowed' : 'pointer',
+                                cursor: 'pointer',
                                 borderRadius: '4px'
                             }}
                         >
                             <option value="c">C (GCC 10.2)</option>
                             <option value="java">Java (OpenJDK 15)</option>
                         </select>
-                        {isSessionActive && <span style={{ position: 'absolute', right: '-10px', top: '-10px', fontSize: '0.8rem' }}>🔒</span>}
                     </div>
 
                     {!isSessionActive ? (
