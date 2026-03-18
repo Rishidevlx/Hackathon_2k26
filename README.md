@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🚀 Hackathon 2K26
-<img src="https://capsule-render.vercel.app/api?type=waving&color=00ff41&height=200&section=header&text=QMAZE%20IDE&fontSize=80&fontColor=000&animation=fadeIn" alt="QMAZE Header">
+<img src="https://capsule-render.vercel.app/api?type=waving&color=00ff41&height=200&section=header&text=HACKATHON%20IDE&fontSize=80&fontColor=000&animation=fadeIn" alt="QMAZE Header">
 
 [![Made with React](https://img.shields.io/badge/Frontend-React.js-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Powered by Node.js](https://img.shields.io/badge/Backend-Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
