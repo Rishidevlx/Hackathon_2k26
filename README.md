@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 QMAZE IDE v2.0 - Pattern Matching Engine
+# 🚀 Hackathon 2K26
 <img src="https://capsule-render.vercel.app/api?type=waving&color=00ff41&height=200&section=header&text=QMAZE%20IDE&fontSize=80&fontColor=000&animation=fadeIn" alt="QMAZE Header">
 
 [![Made with React](https://img.shields.io/badge/Frontend-React.js-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
