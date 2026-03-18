@@ -51,12 +51,12 @@ function App() {
     setView('login');
   };
 
-  const handleLogin = async (lotNo, lotName, collegeName) => {
+  const handleLogin = async (lotNo, lotName, collegeName, department, year) => {
     try {
       const initRes = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lotNumber: lotNo, lotName, collegeName, category })
+        body: JSON.stringify({ lotNumber: lotNo, lotName, collegeName: collegeName || '', category, department: department || '', year: year || '' })
       });
       const initData = await initRes.json();
 
@@ -69,16 +69,18 @@ function App() {
           dbPatternsCompleted: initData.user.patterns_completed,
           dbStatus: initData.user.status,
           dbCodeData: initData.user.code_data,
-          category: initData.user.category
+          category: initData.user.category,
+          department: initData.user.department || department || '',
+          year: initData.user.year || year || '',
         });
         setView('editor');
       } else {
-        setUserData({ lotNo, lotName, collegeName });
+        setUserData({ lotNo, lotName, collegeName, department, year });
         setView('editor');
       }
     } catch (err) {
       console.error("Login sync failed", err);
-      setUserData({ lotNo, lotName, collegeName });
+      setUserData({ lotNo, lotName, collegeName, department, year });
       setView('editor');
     }
   };

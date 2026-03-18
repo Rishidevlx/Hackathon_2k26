@@ -7,10 +7,24 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ── Auto-migrate: add department & year columns if they don't exist ─────────
+(async () => {
+    try {
+        await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(60) DEFAULT ''`);
+        await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS year VARCHAR(10) DEFAULT ''`);
+        console.log('[DB] department & year columns ready.');
+    } catch (e) {
+        // TiDB supports IF NOT EXISTS — ignore any other edge-case errors silently
+        console.warn('[DB] Migration note:', e.message);
+    }
+})();
+
 // ── CORS: allow Netlify frontends + localhost in dev ──────────────────────────
 const allowedOrigins = [
     'http://localhost:5173',          // frontend dev
     'http://localhost:5174',          // admin dev
+    'http://localhost:5175',          // frontend dev (vite fallback port)
+    'http://localhost:5176',          // frontend dev (vite fallback port)
     process.env.FRONTEND_URL,        // e.g. https://qmaze-pattern.netlify.app
     process.env.ADMIN_URL,           // e.g. https://qmaze-admin.netlify.app
 ].filter(Boolean); // remove undefined entries
@@ -50,21 +64,29 @@ app.post('/api/admin/login', (req, res) => {
 
 // 2. Participant Login (Start/Resume Session)
 app.post('/api/login', async (req, res) => {
-    const { lotNumber, lotName, collegeName, category } = req.body;
+    const { lotNumber, lotName, collegeName, category, department, year } = req.body;
     const normalizedLot = lotNumber.toUpperCase();
     try {
         // Check if user exists
         const [rows] = await db.query('SELECT * FROM users WHERE lot_number = ?', [normalizedLot]);
 
         if (rows.length > 0) {
-            return res.json({ success: true, user: rows[0], isNew: false });
+            // Update department & year in case they re-login with corrected info
+            await db.query(
+                'UPDATE users SET department = ?, year = ? WHERE lot_number = ?',
+                [department || rows[0].department || '', year || rows[0].year || '', normalizedLot]
+            );
+            const updated = { ...rows[0], department: department || rows[0].department || '', year: year || rows[0].year || '' };
+            return res.json({ success: true, user: updated, isNew: false });
         } else {
-            // New User, Create
+            // New User — Create
             const newUser = {
                 lot_number: normalizedLot,
                 lot_name: lotName,
-                college_name: collegeName,
+                college_name: collegeName || '',
                 category: category || 'UG',
+                department: department || '',
+                year: year || '',
                 start_time: null,
                 total_time: 0,
                 patterns_completed: 0,
@@ -194,7 +216,7 @@ app.get('/api/leaderboard', async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT 
-                lot_number, lot_name, college_name, category,
+                lot_number, lot_name, college_name, category, department, year,
                 status, start_time, end_time, total_time,
                 warnings, lines_of_code, attempts,
                 no_of_loops, patterns_completed, language, last_active
@@ -332,6 +354,23 @@ app.delete('/api/admin/patterns/:id', async (req, res) => {
     try {
         await db.query('DELETE FROM patterns WHERE id = ?', [id]);
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 8.1 Pattern Stats (to calculate dynamic scores)
+app.get('/api/admin/pattern-stats', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT category, COUNT(*) as count 
+            FROM patterns 
+            WHERE is_active = TRUE 
+            GROUP BY category
+        `);
+        const stats = {};
+        rows.forEach(r => stats[r.category.toUpperCase()] = r.count);
+        res.json(stats);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

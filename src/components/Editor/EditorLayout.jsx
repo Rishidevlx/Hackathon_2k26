@@ -142,6 +142,9 @@ const EditorLayout = ({ userData, onLogout }) => {
         fetchSessionDuration();
     }, []); // ← [] means: runs ONCE only on mount, NOT a recurring poll
 
+    const iFrameRef = useRef(null);
+    const pendingSubmitRef = useRef(false); // tracks whether the pending run is a submit
+
     const [isRunning, setIsRunning] = useState(false);
     const [isSessionActive, setIsSessionActive] = useState(Boolean(userData.dbStartTime));
     const [isSuccess, setIsSuccess] = useState(userData.dbStatus === 'finished');
@@ -258,6 +261,7 @@ const EditorLayout = ({ userData, onLogout }) => {
     };
 
     const formatTime = (ms) => {
+        if (!ms || ms < 0) return '00:00:00:00';
         const h = Math.floor(ms / 3600000);
         const m = Math.floor((ms % 3600000) / 60000);
         const s = Math.floor((ms % 60000) / 1000);
@@ -329,41 +333,85 @@ const EditorLayout = ({ userData, onLogout }) => {
         return () => clearInterval(interval);
     }, [isSessionActive, isSuccess]);
 
-    const handleRun = async (isSubmit = false) => {
+    // ── OneCompiler language mapping ──────────────────────────────────────────
+    const ONE_COMPILER_LANG_MAP = {
+        c:    { lang: 'c',    file: 'main.c'    },
+        java: { lang: 'java', file: 'Main.java' },
+    };
+
+    // ── Send code to OneCompiler iframe, then trigger run ────────────────────
+    const handleRun = (isSubmit = false) => {
         if (isRunning || !isSessionActive) return;
-        // Block run if completed
         if (completedPatterns.includes(currentPattern.id)) return;
 
         setIsRunning(true);
         if (isSubmit) setAttempts(prev => prev + 1);
 
-        try {
-            const response = await fetch(`${API_URL}/api/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ language, code: currentCode, lotNumber: userData.lotNo })
-            });
-            const result = await response.json();
+        const iFrame = iFrameRef.current;
+        if (!iFrame || !iFrame.contentWindow) {
             setIsRunning(false);
-            if (result.run) {
-                const output = result.run.stdout || result.run.stderr;
-                // Only show the raw output — no extra wrapper messages
-                setLogs(prev => [...prev,
-                    { time: '', text: output, type: result.run.stderr ? 'error' : 'output' }
-                ]);
+            return;
+        }
 
-                if (isSubmit && !result.run.stderr && checkPatternMatch(output)) {
-                    const newCompleted = [ ...new Set([...completedPatterns, currentPattern.id])];
+        const { lang, file } = ONE_COMPILER_LANG_MAP[language] || ONE_COMPILER_LANG_MAP.c;
+        // 1. Mark pending submit flag so the message handler knows what to do
+        pendingSubmitRef.current = isSubmit;
+
+        // Store the current pattern id at the time of run (for closure safety)
+        const patternAtRun = currentPattern;
+
+        // 2. Populate code
+        iFrame.contentWindow.postMessage(
+            {
+                eventType: 'populateCode',
+                language: lang,
+                files: [{ name: file, content: currentCode }],
+            },
+            '*'
+        );
+
+        // 3. Trigger run after a short delay to allow OneCompiler to load the code
+        setTimeout(() => {
+            if (iFrame.contentWindow) {
+                iFrame.contentWindow.postMessage({ eventType: 'triggerRun' }, '*');
+            }
+        }, 300);
+
+        setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: '> Compiling & executing...', type: 'output' }]);
+    };
+
+    const checkPatternMatch = (output) => {
+        if (!currentPattern) return false;
+        const norm = (s) => s.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).filter(l => l !== '').join('\n').toUpperCase();
+        return norm(output) === norm(currentPattern.target_output);
+    };
+
+    // ── Listen for results back from OneCompiler iframe ───────────────────────
+    useEffect(() => {
+        const handleOneCompilerMessage = (e) => {
+            // OneCompiler sends { language, result: { output, success } }
+            if (!e.data || !e.data.language) return;
+
+            const { output = '', success } = e.data.result || {};
+            const isSubmit = pendingSubmitRef.current;
+            pendingSubmitRef.current = false;
+            setIsRunning(false);
+
+            const hasError = !success;
+            setLogs(prev => [...prev, { time: '', text: output, type: hasError ? 'error' : 'output' }]);
+
+            if (isSubmit) {
+                if (!hasError && checkPatternMatch(output)) {
+                    const newCompleted = [...new Set([...stateRef.current.completedPatterns, stateRef.current.currentPattern.id])];
                     setCompletedPatterns(newCompleted);
                     triggerSync({ completedPatterns: newCompleted });
                     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: '>>> CHALLENGE SECURED! SCORE UPDATED. <<<', type: 'success' }]);
                     setShowLevelSuccess(true);
-                    
+
                     if (newCompleted.length < allPatterns.length) {
                         setTimeout(() => {
                             setShowLevelSuccess(false);
-                            const idx = allPatterns.findIndex(p => p.id === currentPattern.id);
-                            // Auto move to next level
+                            const idx = allPatterns.findIndex(p => p.id === stateRef.current.currentPattern.id);
                             setCurrentPattern(allPatterns[idx + 1]);
                         }, 2000);
                     } else {
@@ -373,21 +421,24 @@ const EditorLayout = ({ userData, onLogout }) => {
                         fetch(`${API_URL}/api/finish`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ lotNumber: userData.lotNo, totalTime: initialDuration - metrics.time, patternsCompleted: newCompleted.length, codeMap: { language, map: { ...codeMap, [currentPattern.id]: currentCode } } })
+                            body: JSON.stringify({
+                                lotNumber: userData.lotNo,
+                                totalTime: stateRef.current.initialDuration - stateRef.current.metrics.time,
+                                patternsCompleted: newCompleted.length,
+                                codeMap: { language, map: { ...stateRef.current.codeMap, [stateRef.current.currentPattern.id]: stateRef.current.currentCode } }
+                            })
                         }).catch(console.error);
                     }
-                } else if (isSubmit) {
+                } else {
                     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: '>>> OUTPUT MISMATCH. ACCESS DENIED. <<<', type: 'error' }]);
                 }
             }
-        } catch (err) { setIsRunning(false); }
-    };
+        };
 
-    const checkPatternMatch = (output) => {
-        if (!currentPattern) return false;
-        const norm = (s) => s.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).filter(l => l !== '').join('\n').toUpperCase();
-        return norm(output) === norm(currentPattern.target_output);
-    };
+        window.addEventListener('message', handleOneCompilerMessage);
+        return () => window.removeEventListener('message', handleOneCompilerMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allPatterns, language, userData]);
 
     const handleLanguageChange = (e) => {
         const newLang = e.target.value;
@@ -417,8 +468,23 @@ const EditorLayout = ({ userData, onLogout }) => {
         return () => { window.removeEventListener("mousemove", resize); window.removeEventListener("mouseup", stopResizing); };
     }, [isResizing]);
 
+    // ── OneCompiler iframe src — language switcher ────────────────────────────
+    const oneCompilerSrc = language === 'java'
+        ? 'https://onecompiler.com/embed/java?codeChangeEvent=true&listenToEvents=true&theme=dark&hideNew=true&hideob=true'
+        : 'https://onecompiler.com/embed/c?codeChangeEvent=true&listenToEvents=true&theme=dark&hideNew=true&hideob=true';
+
     return (
         <div className="editor-layout" style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: '#0e1015', color: '#e0e0e0', fontFamily: 'Inter, sans-serif' }}>
+            {/* Hidden OneCompiler Execution iframe */}
+            <iframe
+                ref={iFrameRef}
+                src={oneCompilerSrc}
+                title="onecompiler-executor"
+                style={{ display: 'none', width: 0, height: 0, border: 'none', position: 'absolute' }}
+                allow="storage-access *; autoplay"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            />
+
             {/* Security Overlay */}
             {!isFocused && !isDisqualified && !isSuccess && (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: 'rgba(200, 0, 0, 0.98)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'white', textAlign: 'center' }}>
@@ -523,7 +589,7 @@ const EditorLayout = ({ userData, onLogout }) => {
                     }}>
                         <div style={{ fontSize: '0.65rem', color: '#00e5ff', fontFamily: 'Orbitron', fontWeight: 'bold', marginBottom: '2px' }}>TOTAL_SCORE</div>
                         <div className="score" style={{ fontFamily: 'Orbitron', color: '#fff', fontSize: '1.4rem', fontWeight: 'bold', textShadow: '0 0 10px #00e5ff' }}>
-                            {completedPatterns.length * 25} <span style={{fontSize:'0.8rem', color:'#00e5ff', opacity: 0.7}}>/ 100</span>
+                            {allPatterns.length > 0 ? Math.round((completedPatterns.length / allPatterns.length) * 100) : 0} <span style={{fontSize:'0.8rem', color:'#00e5ff', opacity: 0.7}}>/ 100</span>
                         </div>
                     </div>
 
