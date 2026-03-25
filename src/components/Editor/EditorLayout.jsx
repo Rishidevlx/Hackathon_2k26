@@ -393,6 +393,11 @@ const EditorLayout = ({ userData, onLogout }) => {
             if (!e.data || !e.data.language) return;
 
             const { output = '', success } = e.data.result || {};
+
+             if (!output || output.trim() === '') {
+                console.log("⏳ Ignoring empty output...");
+                return;
+            }
             const isSubmit = pendingSubmitRef.current;
             pendingSubmitRef.current = false;
             setIsRunning(false);
